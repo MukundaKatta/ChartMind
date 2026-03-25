@@ -39,6 +39,12 @@ def match_chart_type(query: str, patterns: dict[str, list[str]]) -> str:
     Tries longer patterns first so "bar chart" beats "bar".
     Falls back to "bar" if nothing matches.
     """
+    # First pass: check if the query starts with or explicitly names a chart type
+    for chart_type in patterns:
+        if query.startswith(chart_type) or f" {chart_type} " in f" {query} ":
+            return chart_type
+
+    # Second pass: keyword matching, longest match wins
     best_type = "bar"
     best_len = 0
     for chart_type, keywords in patterns.items():
@@ -87,7 +93,18 @@ def extract_columns_from_query(query: str, columns: list[str]) -> list[str]:
         if pos >= 0:
             found.append((pos, col))
     found.sort(key=lambda x: x[0])
-    return [col for _, col in found]
+    ordered = [col for _, col in found]
+
+    # If query contains "Y by X" pattern, ensure X comes first (as x-axis)
+    if len(ordered) == 2 and " by " in query_lower:
+        by_pos = query_lower.find(" by ")
+        col0_pos = query_lower.find(ordered[0].lower())
+        col1_pos = query_lower.find(ordered[1].lower())
+        # The column after "by" is the x-axis (grouping dimension)
+        if col1_pos > by_pos > col0_pos:
+            ordered = [ordered[1], ordered[0]]
+
+    return ordered
 
 
 # ---------------------------------------------------------------------------
